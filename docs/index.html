@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Toto</title>
+  <link rel="icon" type="image/png" href="./assets/img/logopwa.png">
+  <link rel="apple-touch-icon" href="./assets/img/logopwa.png">
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#8B5CF6">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./css/styles.css">
+
+  <!-- Leaflet CSS & JS for lightweight, data-efficient live map tracking -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+      }
+    }
+  </script>
+
+  <!-- Import model-viewer web component from Google CDN -->
+  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+</head>
+<body>
+
+  <div id="app-container">
+    <!-- 3D Canvas / Model Viewer Container -->
+    <div id="canvas-container">
+      <model-viewer
+        id="bot-model-viewer"
+        src="./assets/img/ia.gltf"
+        alt="Personaje 3D"
+        auto-rotate
+        auto-rotate-delay="3000"
+        rotation-per-second="4deg"
+        camera-controls
+        disable-zoom
+        disable-pan
+        shadow-intensity="1"
+        shadow-softness="0.8"
+        exposure="1"
+        touch-action="none"
+        interaction-prompt="none"
+        style="width: 100%; height: 100%; outline: none;"
+      >
+        <!-- Fallback ThreeJS canvas container inside if model-viewer fails -->
+        <div id="three-canvas-fallback" style="width: 100%; height: 100%;"></div>
+      </model-viewer>
+    </div>
+
+    <!-- Top Navigation Header Bar -->
+    <header class="top-bar">
+      <div class="top-actions-left" style="pointer-events: auto;">
+        <!-- Location Sharing Button (Left side of top bar) -->
+        <button id="btn-location-share" class="btn-icon" title="Ubicación en tiempo real" aria-label="Ubicación">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+        </button>
+      </div>
+
+      <div class="top-actions">
+        <!-- Audio Speech Toggle -->
+        <button id="btn-toggle-speech" class="btn-icon active" title="Voz" aria-label="Voz">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+        </button>
+
+        <!-- Real-time Translator Page Button -->
+        <a href="./translate.html" class="btn-icon" title="Traductor en tiempo real" aria-label="Traductor">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 6 6"></path><path d="m4 14 6-6 2 2 1.5-1.5"></path><path d="M2 5h12"></path><path d="M7 2h1v3H7z"></path><path d="M22 22l-5-10-5 10"></path><path d="M14 18h6"></path></svg>
+        </a>
+
+        <!-- Post-it Notes Page Button -->
+        <a href="./notas.html" class="btn-icon" title="Notas Post-it" aria-label="Notas Post-it">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+        </a>
+
+        <!-- Learn / Knowledge Base Page Button -->
+        <a href="./aprender.html" class="btn-icon" title="Base de Conocimiento" aria-label="Base de Conocimiento">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+        </a>
+      </div>
+    </header>
+
+    <!-- Floating Thought / Speech Bubble -->
+    <div class="thought-bubble-container">
+      <div id="thought-bubble" class="thought-bubble">
+        <p id="thought-text">¡Hola! ¿En qué te puedo ayudar hoy?</p>
+      </div>
+      <div class="thought-tail">
+        <div class="thought-tail-dot dot-1"></div>
+        <div class="thought-tail-dot dot-2"></div>
+      </div>
+    </div>
+
+    <!-- Floating Strategic Action Control Bar -->
+    <div class="bottom-control-bar">
+      <!-- Camera Button -->
+      <button id="btn-camera" class="btn-icon" title="Camara" aria-label="Camara">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+      </button>
+
+      <!-- Main Mic / Voice Speak Button -->
+      <button id="btn-mic" class="btn-icon btn-main-mic" title="Hablar" aria-label="Hablar">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+      </button>
+
+      <!-- Toggle Chat Drawer Button -->
+      <button id="btn-chat-toggle" class="btn-icon" title="Chat" aria-label="Chat">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+      </button>
+    </div>
+
+    <!-- Chat Drawer Side Panel -->
+    <aside id="chat-drawer" class="chat-drawer">
+      <div class="chat-header">
+        <div></div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <!-- Clear Chat Button -->
+          <button id="btn-clear-chat" class="btn-icon" style="width: 36px; height: 36px;" title="Limpiar Chat" aria-label="Limpiar Chat">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          </button>
+          <!-- Chat Voice Toggle Button -->
+          <button id="btn-chat-toggle-speech" class="btn-icon active" style="width: 36px; height: 36px;" title="Voz en Chat" aria-label="Voz en Chat">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+          </button>
+          <button id="btn-close-chat" class="btn-icon" style="width: 36px; height: 36px;" title="Cerrar Chat" aria-label="Cerrar Chat">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+      </div>
+
+      <div id="chat-messages" class="chat-messages">
+        <div class="chat-msg ai">
+          ¡Hola! ¿En qué te puedo ayudar hoy?
+        </div>
+      </div>
+
+      <!-- Attached Image Preview Container -->
+      <div id="attached-preview" style="display: none; padding: 8px 16px; background: #f8fafc; border-top: 1px solid #e2e8f0; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <img id="attached-img" src="" style="width: 40px; height: 40px; border-radius: 8px; object-fit: cover;">
+          <span style="font-size: 0.85rem; color: #475569;">Imagen adjunta</span>
+        </div>
+        <button id="btn-remove-attachment" style="background: none; border: none; font-size: 1.1rem; cursor: pointer;">✕</button>
+      </div>
+
+      <!-- Hidden file input for image upload inside chat -->
+      <input type="file" id="chat-file-input" accept="image/*" style="display: none;">
+
+      <div class="chat-input-bar">
+        <!-- Image upload button in chat -->
+        <button id="btn-chat-image" class="btn-chat-action" title="Cargar Imagen" aria-label="Cargar Imagen">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+        </button>
+
+        <!-- Voice mic button in chat -->
+        <button id="btn-chat-mic" class="btn-chat-action" title="Hablar por voz" aria-label="Hablar por voz">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+        </button>
+
+        <input type="text" id="chat-input" placeholder="Escribe un mensaje o arrastra una imagen..." autocomplete="off">
+
+        <button id="btn-send-chat" class="btn-send" title="Enviar" aria-label="Enviar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Camera Modal Dialog -->
+    <div id="camera-modal" class="camera-modal">
+      <div class="camera-box">
+        <h3 style="font-size: 1.1rem; color: #1e1b4b; display: flex; align-items: center; gap: 8px;">
+          Capturar Foto
+        </h3>
+        <video id="camera-stream" class="camera-preview" autoplay playsinline></video>
+        <canvas id="camera-canvas" style="display: none;"></canvas>
+        <div class="camera-controls">
+          <button id="btn-snap-photo" class="btn-action btn-snap">
+            Capturar Foto
+          </button>
+          <button id="btn-close-camera" class="btn-action btn-close-cam">
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active Alarm Alert Overlay Modal -->
+    <div id="alarm-modal" class="alarm-overlay-modal">
+      <div class="alarm-alert-card">
+        <div style="font-size: 0.8rem; font-weight: 700; color: #9333ea; letter-spacing: 0.05em; text-transform: uppercase;" id="alarm-alert-type">Alarma Activa</div>
+        <div class="alarm-alert-title" id="alarm-alert-name">Hora de despertar</div>
+        <div class="alarm-alert-time" id="alarm-alert-time">07:00 AM</div>
+        <div class="alarm-alert-msg" id="alarm-alert-msg">"Es hora de despertar y comenzar el dia."</div>
+        <div class="alarm-alert-actions">
+          <button id="btn-stop-alarm" class="btn-stop-alarm">Detener</button>
+          <button id="btn-snooze-alarm" class="btn-snooze-alarm">Posponer 5 min</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>

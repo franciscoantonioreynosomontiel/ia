@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Toto - Notas</title>
+  <link rel="icon" type="image/png" href="./assets/img/logopwa.png">
+  <link rel="apple-touch-icon" href="./assets/img/logopwa.png">
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#8B5CF6">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Caveat:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./css/styles.css">
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+      }
+    }
+  </script>
+</head>
+<body class="page-learn">
+
+  <div class="learn-container" style="max-width: 1200px;">
+    <!-- Top Bar Navigation -->
+    <div class="learn-header">
+      <div class="header-title-group">
+        <h1>Notas Post-it</h1>
+      </div>
+      <div class="header-nav-buttons">
+        <a href="./alarmas.html" class="btn-back">Alarmas</a>
+        <a href="./notas.html" class="btn-back">Notas</a>
+        <a href="./recordatorios.html" class="btn-back">Recordatorios</a>
+        <a href="./aprender.html" class="btn-back">Conocimiento</a>
+        <a href="./index.html" class="btn-back btn-back-primary">Volver</a>
+      </div>
+    </div>
+
+    <!-- Sticky Board Container -->
+    <div id="notes-board" class="notes-board">
+      <!-- The '+' Card Button will be rendered here along with Post-it Notes -->
+    </div>
+  </div>
+
+  <!-- Note Modal / Editor Dialog -->
+  <div id="note-modal" class="note-modal">
+    <div class="note-modal-card">
+      <div class="modal-header">
+        <h3 id="modal-title">Nueva Nota Post-it</h3>
+        <button id="btn-close-modal" class="btn-close-modal">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="note-title-input">Nombre de la nota</label>
+          <input type="text" id="note-title-input" class="form-input">
+        </div>
+
+        <div class="form-group">
+          <label for="note-content-input">Contenido</label>
+          <textarea id="note-content-input" class="form-textarea" style="min-height: 80px;"></textarea>
+        </div>
+
+        <!-- Checklist Items Manager -->
+        <div class="form-group">
+          <label>Lista con casillas de verificacion</label>
+          <div id="checklist-editor" class="checklist-editor">
+            <div class="checklist-add-row" style="display: flex; gap: 8px; margin-bottom: 8px;">
+              <input type="text" id="checklist-item-input" class="form-input" placeholder="Elemento a comprar o realizar...">
+              <button type="button" id="btn-add-checklist-item" class="btn-tool" style="white-space: nowrap;">Agregar</button>
+            </div>
+            <div id="checklist-items-list" class="checklist-items-list">
+              <!-- Rendered checklist items in modal -->
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row" style="gap: 16px; flex-wrap: wrap;">
+          <!-- Color Picker -->
+          <div class="form-group flex-1">
+            <label>Color del Post-it</label>
+            <div class="color-picker-group">
+              <button type="button" class="color-swatch active" data-color="#fef08a" style="background: #fef08a;"></button>
+              <button type="button" class="color-swatch" data-color="#fbcfe8" style="background: #fbcfe8;"></button>
+              <button type="button" class="color-swatch" data-color="#bae6fd" style="background: #bae6fd;"></button>
+              <button type="button" class="color-swatch" data-color="#bbf7d0" style="background: #bbf7d0;"></button>
+              <button type="button" class="color-swatch" data-color="#e9d5ff" style="background: #e9d5ff;"></button>
+            </div>
+          </div>
+
+          <!-- Size Selection -->
+          <div class="form-group flex-1">
+            <label for="note-size-select">Tamaño</label>
+            <select id="note-size-select" class="form-input custom-select">
+              <option value="220x220">Pequeño (220x220)</option>
+              <option value="260x260" selected>Mediano (260x260)</option>
+              <option value="320x320">Grande (320x320)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Drawing Canvas Area -->
+        <div class="form-group">
+          <label>Dibujar en la nota</label>
+          <div class="drawing-container">
+            <div class="drawing-toolbar">
+              <input type="color" id="draw-color-picker" value="#2e1065" class="draw-color-input">
+              <input type="range" id="draw-line-width" min="1" max="15" value="3" style="width: 80px;">
+              <button type="button" id="btn-clear-canvas" class="btn-tool">Limpiar Dibujo</button>
+            </div>
+            <canvas id="note-canvas" width="400" height="200" class="note-drawing-canvas"></canvas>
+          </div>
+        </div>
+
+        <!-- Image Upload Attachment -->
+        <div class="form-group">
+          <label>Agregar Imagen</label>
+          <div class="custom-file-wrapper">
+            <input type="file" id="note-image-input" class="file-input-hidden" accept="image/*">
+            <label for="note-image-input" class="custom-file-btn">
+              <span>Seleccionar Imagen</span>
+            </label>
+            <span id="note-image-name" class="file-name-display">Sin imagen</span>
+            <button type="button" id="btn-remove-note-img" class="btn-delete" style="display: none; padding: 4px 10px;">Quitar</button>
+          </div>
+          <div id="note-image-preview-box" style="margin-top: 8px; display: none;">
+            <img id="note-image-preview" src="" style="max-height: 120px; border-radius: 8px; object-fit: contain;">
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="btn-save-note" class="btn-primary-action">Guardar Nota</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Full Screen Note View Modal Overlay -->
+  <div id="note-view-modal" class="note-modal">
+    <div class="note-modal-card note-view-card" id="note-view-card" style="max-width: 680px; width: 95vw; border-radius: 28px; padding: 28px;">
+      <div class="modal-header" style="border-bottom: 2px dashed rgba(0,0,0,0.12); padding-bottom: 14px;">
+        <div style="display: flex; align-items: center; gap: 10px; overflow: hidden;">
+          <span style="font-size: 1.5rem;">📌</span>
+          <h2 id="view-note-title" style="font-family: 'Caveat', cursive, sans-serif; font-size: 2rem; color: #1e1b4b; font-weight: 700; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></h2>
+        </div>
+        <button id="btn-close-view-modal" class="btn-close-modal" style="font-size: 1.5rem; padding: 4px 8px;">✕</button>
+      </div>
+
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 20px; padding-top: 18px; overflow-y: auto; max-height: 68vh;">
+        <div id="view-note-content" class="postit-text" style="font-size: 1.4rem; line-height: 1.5; color: #2e1065;"></div>
+        <div id="view-note-drawing-box" class="postit-drawing-box" style="display: none;">
+          <img id="view-note-drawing" src="" alt="Dibujo" style="max-height: 300px; width: 100%; object-fit: contain; border-radius: 12px; background: rgba(255,255,255,0.7); border: 1px solid rgba(0,0,0,0.08); padding: 8px;">
+        </div>
+        <div id="view-note-image-box" class="postit-image-box" style="display: none;">
+          <img id="view-note-image" src="" alt="Imagen" style="max-height: 450px; width: 100%; object-fit: contain; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.1);">
+        </div>
+      </div>
+
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid rgba(0,0,0,0.08); padding-top: 16px; margin-top: 10px;">
+        <button id="btn-edit-from-view" class="btn-secondary-action" style="width: auto; padding: 10px 20px;">Editar Nota</button>
+        <button id="btn-close-view-modal-bottom" class="btn-primary-action" style="width: auto; padding: 10px 24px;">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./js/notas.js"></script>
+</body>
+</html>

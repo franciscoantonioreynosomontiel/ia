@@ -1,0 +1,843 @@
+// Knowledge Management Logic (Aprender)
+import './app.js';
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+const SUPABASE_URL = 'https://qqjhadwxboeichxtxree.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFxamhhZHd4Ym9laWNoeHR4cmVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4NDY4ODAsImV4cCI6MjA5NTQyMjg4MH0.dM1VaV-lDPxoPlOHGAIbgfCSE3RMdURcVubq8tTs6yQ';
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const KNOWLEDGE_STORAGE_KEY = 'ia_agent_knowledge';
+const ALARMS_STORAGE_KEY = 'ia_agent_alarms_reminders';
+
+let currentFilter = 'all';
+let currentSearchQuery = '';
+let currentRuleType = 'alarma';
+let currentScheduleMode = 'days';
+let uploadedSoundData = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+  setupTabs();
+  setupFilters();
+  setupFileInputDisplay();
+  setupAlgorithmUI();
+  setupVoiceUI();
+  renderKnowledgeList();
+
+  // Load latest data from Supabase
+  fetchSupabaseData();
+
+  // Handlers for Column 1 Uploads
+  document.getElementById('btn-add-faq')?.addEventListener('click', handleAddFaq);
+  document.getElementById('btn-add-sheet')?.addEventListener('click', handleAddSheet);
+  document.getElementById('btn-upload-file')?.addEventListener('click', handleUploadFile);
+  document.getElementById('btn-add-algorithm')?.addEventListener('click', handleAddAlgorithm);
+});
+
+async function fetchSupabaseData() {
+  try {
+    const { data: knowledgeData, error: kErr } = await supabase.from('knowledge').select('*');
+    if (!kErr && Array.isArray(knowledgeData) && knowledgeData.length > 0) {
+      const items = knowledgeData.map((k) => ({
+        id: 'faq_' + k.id,
+        db_id: k.id,
+        type: k.type,
+        title: k.title,
+        content: k.content,
+        url: k.url,
+        createdAt: k.created_at
+      }));
+      localStorage.setItem(KNOWLEDGE_STORAGE_KEY, JSON.stringify(items));
+    }
+
+    const { data: alarmsData, error: aErr } = await supabase.from('alarms_reminders').select('*');
+    if (!aErr && Array.isArray(alarmsData) && alarmsData.length > 0) {
+      const rules = alarmsData.map((a) => ({
+        id: 'alg_' + a.id,
+        db_id: a.id,
+        type: a.type,
+        category: 'algorithm',
+        title: a.name,
+        name: a.name,
+        message: a.message,
+        scheduleMode: a.schedule_mode || 'days',
+        days: a.days || [],
+        date: a.specific_date || null,
+        time: a.time || '08:00',
+        useRange: a.use_range || false,
+        rangeStart: a.range_start || null,
+        rangeEnd: a.range_end || null,
+        sound: a.sound || 'Predeterminado',
+        soundUrl: a.sound_url || null,
+        volume: a.volume || 0.8,
+        active: a.active !== false,
+        createdAt: a.created_at
+      }));
+      localStorage.setItem(ALARMS_STORAGE_KEY, JSON.stringify(rules));
+    }
+
+    renderKnowledgeList();
+  } catch (e) {
+    console.warn('Could not fetch initial data from Supabase:', e);
+  }
+}
+
+function setupFileInputDisplay() {
+  const fileInput = document.getElementById('file-input');
+  const nameDisplay = document.getElementById('file-chosen-name');
+
+  if (fileInput && nameDisplay) {
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files && fileInput.files.length > 0) {
+        nameDisplay.textContent = fileInput.files[0].name;
+      } else {
+        nameDisplay.textContent = 'Sin archivos seleccionados';
+      }
+    });
+  }
+}
+
+function setupAlgorithmUI() {
+  const typeSelect = document.getElementById('rule-type-select');
+  const alarmOnlyFields = document.getElementById('alarm-only-fields');
+
+  if (typeSelect && alarmOnlyFields) {
+    const updateVisibility = () => {
+      currentRuleType = typeSelect.value || 'recordatorio';
+      if (currentRuleType === 'alarma') {
+        alarmOnlyFields.style.display = 'flex';
+      } else {
+        alarmOnlyFields.style.display = 'none';
+      }
+    };
+
+    typeSelect.addEventListener('change', updateVisibility);
+    updateVisibility();
+  }
+
+  const segmentScheduleBtns = document.querySelectorAll('.segment-schedule');
+  const daysContainer = document.getElementById('rule-days-container');
+  const dateContainer = document.getElementById('rule-date-container');
+
+  segmentScheduleBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      segmentScheduleBtns.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentScheduleMode = btn.getAttribute('data-mode') || 'days';
+
+      if (currentScheduleMode === 'days') {
+        if (daysContainer) daysContainer.style.display = 'flex';
+        if (dateContainer) dateContainer.style.display = 'none';
+      } else {
+        if (daysContainer) daysContainer.style.display = 'none';
+        if (dateContainer) dateContainer.style.display = 'flex';
+      }
+    });
+  });
+
+  const dayChips = document.querySelectorAll('.day-chip');
+  dayChips.forEach((chip) => {
+    chip.addEventListener('click', () => {
+      chip.classList.toggle('active');
+    });
+  });
+
+  const useRangeCheckbox = document.getElementById('rule-use-range');
+  const singleTimeContainer = document.getElementById('rule-single-time-container');
+  const rangeContainer = document.getElementById('rule-range-container');
+
+  if (useRangeCheckbox) {
+    const updateTimeVisibility = () => {
+      if (useRangeCheckbox.checked) {
+        if (singleTimeContainer) singleTimeContainer.style.display = 'none';
+        if (rangeContainer) rangeContainer.style.display = 'flex';
+      } else {
+        if (singleTimeContainer) singleTimeContainer.style.display = 'flex';
+        if (rangeContainer) rangeContainer.style.display = 'none';
+      }
+    };
+
+    useRangeCheckbox.addEventListener('change', updateTimeVisibility);
+    updateTimeVisibility();
+  }
+
+  const soundInput = document.getElementById('rule-sound-input');
+  const soundNameDisplay = document.getElementById('rule-sound-name');
+  if (soundInput && soundNameDisplay) {
+    soundInput.addEventListener('change', () => {
+      if (soundInput.files && soundInput.files.length > 0) {
+        const soundFile = soundInput.files[0];
+        soundNameDisplay.textContent = soundFile.name;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          uploadedSoundData = {
+            name: soundFile.name,
+            dataUrl: e.target.result
+          };
+        };
+        reader.readAsDataURL(soundFile);
+      } else {
+        uploadedSoundData = null;
+        soundNameDisplay.textContent = 'Sonido predeterminado';
+      }
+    });
+  }
+}
+
+function setupTabs() {
+  const tabBtns = document.querySelectorAll('.tab-btn');
+  tabBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      tabBtns.forEach((b) => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach((tc) => tc.classList.remove('active'));
+
+      btn.classList.add('active');
+      const targetId = btn.getAttribute('data-tab');
+      document.getElementById(targetId)?.classList.add('active');
+    });
+  });
+}
+
+function setupVoiceUI() {
+  const nameInput = document.getElementById('assistant-name-input');
+  const enableCB = document.getElementById('voice-enable-elevenlabs');
+  const voiceSelect = document.getElementById('voice-select');
+  const btnTestVoice = document.getElementById('btn-test-voice');
+  const btnSaveVoice = document.getElementById('btn-save-voice');
+
+  let settings = { enabled: true, voice_id: '', voice_id_es: '', voice_name: '', assistant_name: 'Gemini' };
+  try {
+    const raw = localStorage.getItem('ia_agent_voice_settings');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      settings = { ...settings, ...parsed };
+    }
+  } catch (e) {}
+
+  if (nameInput) nameInput.value = settings.assistant_name || 'Gemini';
+  if (enableCB) enableCB.checked = settings.enabled !== false;
+
+  const currentVoiceId = settings.voice_id_es || settings.voice_id || '';
+
+  if (btnTestVoice) {
+    btnTestVoice.addEventListener('click', testElevenLabsVoice);
+  }
+
+  if (btnSaveVoice) {
+    btnSaveVoice.addEventListener('click', saveVoiceSettings);
+  }
+
+  if (voiceSelect) {
+    voiceSelect.addEventListener('change', () => {
+      if (voiceSelect.value && enableCB) enableCB.checked = true;
+      saveVoiceSettings();
+    });
+  }
+
+  const voiceTabBtn = document.querySelector('.tab-btn[data-tab="tab-voice"]');
+  if (voiceTabBtn) {
+    voiceTabBtn.addEventListener('click', () => {
+      if (voiceSelect && voiceSelect.options.length <= 1) {
+        fetchElevenLabsVoices(currentVoiceId);
+      }
+    });
+  }
+
+  if (voiceSelect) {
+    fetchElevenLabsVoices(currentVoiceId);
+  }
+}
+
+async function fetchElevenLabsVoices(selectedVoiceId = '') {
+  const voiceSelect = document.getElementById('voice-select');
+  if (!voiceSelect) return;
+
+  voiceSelect.innerHTML = '<option value="">Cargando voces desde tu cuenta de ElevenLabs...</option>';
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/voz`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+      },
+      body: JSON.stringify({ action: 'get_voices' })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.error) {
+        showToast(data.error);
+        voiceSelect.innerHTML = '<option value="">Error al cargar voces. Verifica la secret Voz.</option>';
+        return;
+      }
+
+      const voices = data.voices || [];
+      if (voices.length === 0) {
+        voiceSelect.innerHTML = '<option value="">No se encontraron voces descargadas o creadas en tu cuenta</option>';
+        return;
+      }
+
+      voiceSelect.innerHTML = '<option value="">Selecciona una voz de tu cuenta</option>';
+
+      voices.forEach((v) => {
+        let categoryLabel = v.category || 'personalizada';
+        if (v.category === 'premade') categoryLabel = 'Nativa Premade';
+        else if (v.category === 'generated' || v.category === 'cloned') categoryLabel = 'Clonada / Propia';
+        else if (v.category === 'professional') categoryLabel = 'Profesional';
+
+        const optText = `${v.name} (${categoryLabel})`;
+
+        const opt = document.createElement('option');
+        opt.value = v.voice_id;
+        opt.textContent = optText;
+        if (v.voice_id === selectedVoiceId) opt.selected = true;
+        voiceSelect.appendChild(opt);
+      });
+
+      showToast('Voces de tu cuenta cargadas');
+    } else {
+      voiceSelect.innerHTML = '<option value="">Error de conexión con la Edge Function</option>';
+      showToast('Error cargando voces');
+    }
+  } catch (e) {
+    console.error('Error fetching voices:', e);
+    voiceSelect.innerHTML = '<option value="">Error al conectar con la API de Voz</option>';
+    showToast('Error de conexión');
+  }
+}
+
+async function testElevenLabsVoice() {
+  const voiceSelect = document.getElementById('voice-select');
+  const testInput = document.getElementById('voice-test-text');
+
+  const voiceId = voiceSelect ? voiceSelect.value : '';
+  const text = testInput ? testInput.value.trim() : 'Hola, esta es una prueba de mi voz en ElevenLabs.';
+
+  if (!voiceId) {
+    showToast('Selecciona una voz primero');
+    return;
+  }
+
+  if (!text) {
+    showToast('Ingresa un texto de prueba');
+    return;
+  }
+
+  showToast('Sintetizando voz de prueba...');
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/voz`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+      },
+      body: JSON.stringify({
+        action: 'text_to_speech',
+        text: text,
+        voice_id: voiceId
+      })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.error) {
+        showToast(data.error);
+        return;
+      }
+
+      if (data.audio_base64) {
+        const audio = new Audio(`data:audio/mp3;base64,${data.audio_base64}`);
+        audio.play().catch((err) => console.warn('Audio playback error:', err));
+        showToast('Reproduciendo audio de prueba');
+      }
+    } else {
+      showToast('Error de red al probar la voz');
+    }
+  } catch (e) {
+    console.error('Error testing voice:', e);
+    showToast('Error al intentar probar la voz');
+  }
+}
+
+function saveVoiceSettings() {
+  const nameInput = document.getElementById('assistant-name-input');
+  const enableCB = document.getElementById('voice-enable-elevenlabs');
+  const voiceSelect = document.getElementById('voice-select');
+
+  const assistant_name = nameInput ? (nameInput.value.trim() || 'Gemini') : 'Gemini';
+  const voice_id = voiceSelect ? voiceSelect.value : '';
+  const enabled = enableCB ? enableCB.checked : Boolean(voice_id);
+
+  const selectedOpt = voiceSelect && voiceSelect.selectedIndex >= 0 ? voiceSelect.options[voiceSelect.selectedIndex] : null;
+  const voice_name = selectedOpt ? selectedOpt.textContent.replace(/ \(.*\)$/, '') : '';
+
+  const settings = {
+    enabled,
+    voice_id,
+    voice_id_es: voice_id,
+    voice_name,
+    assistant_name,
+    updatedAt: new Date().toISOString()
+  };
+
+  localStorage.setItem('ia_agent_voice_settings', JSON.stringify(settings));
+  showToast('Configuración de voz guardada exitosamente');
+}
+
+function setupFilters() {
+  const filterChips = document.querySelectorAll('.filter-chip');
+  filterChips.forEach((chip) => {
+    chip.addEventListener('click', () => {
+      filterChips.forEach((c) => c.classList.remove('active'));
+      chip.classList.add('active');
+      currentFilter = chip.getAttribute('data-filter') || 'all';
+      renderKnowledgeList();
+    });
+  });
+
+  const searchInput = document.getElementById('search-title');
+  searchInput?.addEventListener('input', (e) => {
+    currentSearchQuery = e.target.value.toLowerCase().trim();
+    renderKnowledgeList();
+  });
+}
+
+function getLocalKnowledge() {
+  const data = localStorage.getItem(KNOWLEDGE_STORAGE_KEY);
+  return data ? JSON.parse(data) : [];
+}
+
+function getLocalAlarms() {
+  const data = localStorage.getItem(ALARMS_STORAGE_KEY);
+  return data ? JSON.parse(data) : [];
+}
+
+function saveLocalAlarms(items) {
+  localStorage.setItem(ALARMS_STORAGE_KEY, JSON.stringify(items));
+  renderKnowledgeList();
+}
+
+function saveLocalKnowledge(items) {
+  localStorage.setItem(KNOWLEDGE_STORAGE_KEY, JSON.stringify(items));
+  renderKnowledgeList();
+}
+
+async function handleAddFaq() {
+  const questionInput = document.getElementById('faq-question');
+  const answerInput = document.getElementById('faq-answer');
+
+  const question = questionInput.value.trim();
+  const answer = answerInput.value.trim();
+
+  if (!question || !answer) {
+    showToast('Completa el título y la descripción');
+    return;
+  }
+
+  const newItem = {
+    id: 'faq_' + Date.now(),
+    type: 'faq',
+    title: question,
+    content: answer,
+    createdAt: new Date().toISOString()
+  };
+
+  saveItem(newItem);
+  questionInput.value = '';
+  answerInput.value = '';
+  showToast('FAQ guardada con exito');
+}
+
+async function handleAddSheet() {
+  const titleInput = document.getElementById('doc-title');
+  const urlInput = document.getElementById('doc-url');
+  const descInput = document.getElementById('doc-desc');
+
+  const title = titleInput.value.trim();
+  const url = urlInput.value.trim();
+  const desc = descInput.value.trim();
+
+  if (!title || !url) {
+    showToast('Indica el título y la URL');
+    return;
+  }
+
+  let fetchedContent = desc || url;
+
+  if (url.includes('pub?output=csv') || url.includes('.csv')) {
+    try {
+      const res = await fetch(url);
+      if (res.ok) {
+        fetchedContent = (desc ? desc + '\n\n' : '') + (await res.text());
+      }
+    } catch (e) {
+      console.warn('Could not fetch CSV content directly:', e);
+    }
+  }
+
+  const newItem = {
+    id: 'sheet_' + Date.now(),
+    type: 'sheet',
+    title: title,
+    content: fetchedContent,
+    url: url,
+    createdAt: new Date().toISOString()
+  };
+
+  saveItem(newItem);
+  titleInput.value = '';
+  urlInput.value = '';
+  descInput.value = '';
+  showToast('Sheet/URL vinculada con exito');
+}
+
+async function handleUploadFile() {
+  const titleInput = document.getElementById('file-title');
+  const fileInput = document.getElementById('file-input');
+  const descInput = document.getElementById('file-desc');
+
+  const file = fileInput.files[0];
+  const title = titleInput.value.trim() || (file ? file.name : '');
+  const desc = descInput.value.trim();
+
+  if (!file) {
+    showToast('Selecciona un archivo para cargar');
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const textContent = e.target.result;
+    const newItem = {
+      id: 'file_' + Date.now(),
+      type: 'file',
+      title: title,
+      content: (desc ? desc + '\n\n' : '') + textContent,
+      createdAt: new Date().toISOString()
+    };
+
+    saveItem(newItem);
+    titleInput.value = '';
+    fileInput.value = '';
+    descInput.value = '';
+    showToast('Archivo cargado con exito');
+  };
+
+  reader.readAsText(file);
+}
+
+async function handleAddAlgorithm() {
+  const nameInput = document.getElementById('rule-name');
+  const msgInput = document.getElementById('rule-message');
+  const dateInput = document.getElementById('rule-date');
+  const timeInput = document.getElementById('rule-time');
+  const useRangeCB = document.getElementById('rule-use-range');
+  const rangeStart = document.getElementById('rule-range-start');
+  const rangeEnd = document.getElementById('rule-range-end');
+  const volumeRange = document.getElementById('rule-volume');
+
+  const name = nameInput.value.trim();
+  const message = msgInput.value.trim();
+
+  if (!name) {
+    showToast('Especifica un título para la regla / recordatorio');
+    return;
+  }
+
+  const activeDays = [];
+  if (currentScheduleMode === 'days') {
+    document.querySelectorAll('.day-chip.active').forEach((chip) => {
+      activeDays.push(parseInt(chip.getAttribute('data-day')));
+    });
+  }
+
+  const stopActions = [];
+  if (currentRuleType === 'alarma') {
+    document.querySelectorAll('.stop-action-cb:checked').forEach((cb) => {
+      stopActions.push(cb.value);
+    });
+  }
+
+  const newRule = {
+    id: 'alg_' + Date.now(),
+    type: currentRuleType,
+    category: 'algorithm',
+    title: name,
+    name: name,
+    message: message || name,
+    scheduleMode: currentScheduleMode,
+    days: activeDays,
+    date: currentScheduleMode === 'date' ? dateInput.value : null,
+    time: timeInput.value || '08:00',
+    useRange: useRangeCB ? useRangeCB.checked : false,
+    rangeStart: (useRangeCB && useRangeCB.checked) ? rangeStart.value : null,
+    rangeEnd: (useRangeCB && useRangeCB.checked) ? rangeEnd.value : null,
+    sound: currentRuleType === 'alarma' ? (uploadedSoundData ? uploadedSoundData.name : 'Predeterminado') : null,
+    soundUrl: currentRuleType === 'alarma' ? (uploadedSoundData ? uploadedSoundData.dataUrl : null) : null,
+    volume: currentRuleType === 'alarma' ? parseInt(volumeRange.value) / 100 : 0.8,
+    stopActions: currentRuleType === 'alarma' ? stopActions : ['button'],
+    active: true,
+    lastExecuted: null,
+    createdAt: new Date().toISOString()
+  };
+
+  saveAlgorithmItem(newRule);
+
+  nameInput.value = '';
+  msgInput.value = '';
+  uploadedSoundData = null;
+  const soundNameDisplay = document.getElementById('rule-sound-name');
+  if (soundNameDisplay) soundNameDisplay.textContent = 'Sonido predeterminado';
+
+  showToast(`${currentRuleType === 'alarma' ? 'Alarma' : 'Recordatorio'} guardado con exito`);
+}
+
+function saveAlgorithmItem(newRule) {
+  const rules = getLocalAlarms();
+
+  try {
+    supabase.from('alarms_reminders').insert([{
+      type: newRule.type,
+      name: newRule.name,
+      message: newRule.message,
+      schedule_mode: newRule.scheduleMode,
+      days: newRule.days,
+      specific_date: newRule.date,
+      time: newRule.time,
+      timezone: newRule.timezone,
+      use_range: newRule.useRange,
+      range_start: newRule.rangeStart,
+      range_end: newRule.rangeEnd,
+      range_limit: newRule.rangeLimit,
+      voice: newRule.voice,
+      sound: newRule.sound,
+      sound_url: newRule.soundUrl,
+      volume: newRule.volume,
+      repeat: newRule.repeat,
+      repeat_interval: newRule.repeatInterval,
+      max_repeats: newRule.maxRepeats,
+      interaction: newRule.interaction,
+      active: newRule.active
+    }]).select().then(({ data, error }) => {
+      if (!error && data && data[0]) {
+        newRule.db_id = data[0].id;
+      }
+      rules.push(newRule);
+      saveLocalAlarms(rules);
+    });
+  } catch (e) {
+    rules.push(newRule);
+    saveLocalAlarms(rules);
+  }
+}
+
+function saveItem(newItem) {
+  const items = getLocalKnowledge();
+
+  try {
+    supabase.from('knowledge').insert([{
+      type: newItem.type,
+      title: newItem.title,
+      content: newItem.content,
+      url: newItem.url || null
+    }]).select().then(({ data, error }) => {
+      if (!error && data && data[0]) {
+        newItem.db_id = data[0].id;
+      }
+      items.push(newItem);
+      saveLocalKnowledge(items);
+    });
+  } catch (e) {
+    items.push(newItem);
+    saveLocalKnowledge(items);
+  }
+}
+
+function renderKnowledgeList() {
+  const container = document.getElementById('knowledge-list');
+  if (!container) return;
+
+  let knowledgeItems = getLocalKnowledge().map((i) => ({ ...i, category: 'knowledge' }));
+  let alarmItems = getLocalAlarms().map((a) => ({ ...a, category: 'algorithm' }));
+
+  let combined = [];
+
+  if (currentFilter === 'all') {
+    combined = [...knowledgeItems, ...alarmItems];
+  } else if (currentFilter === 'algorithm') {
+    combined = alarmItems;
+  } else {
+    combined = knowledgeItems.filter((i) => i.type === currentFilter);
+  }
+
+  if (currentSearchQuery) {
+    combined = combined.filter(
+      (item) =>
+        (item.title && item.title.toLowerCase().includes(currentSearchQuery)) ||
+        (item.name && item.name.toLowerCase().includes(currentSearchQuery)) ||
+        (item.content && item.content.toLowerCase().includes(currentSearchQuery)) ||
+        (item.message && item.message.toLowerCase().includes(currentSearchQuery))
+    );
+  }
+
+  if (combined.length === 0) {
+    container.innerHTML = `<p style="color: #94a3b8; font-size: 0.9rem; text-align: center; padding: 20px;">No se encontraron registros para el filtro actual.</p>`;
+    return;
+  }
+
+  container.innerHTML = '';
+
+  combined.forEach((item) => {
+    const div = document.createElement('div');
+    div.className = 'knowledge-item';
+
+    if (item.category === 'algorithm') {
+      const dayNames = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
+      let scheduleText = '';
+      if (item.scheduleMode === 'days') {
+        const daysStr = (item.days || []).map((d) => dayNames[d]).join(', ') || 'Todos los dias';
+        scheduleText = `${daysStr} a las ${item.time}`;
+      } else {
+        scheduleText = `Fecha: ${item.date || 'Pendiente'} a las ${item.time}`;
+      }
+
+      if (item.useRange) {
+        scheduleText += ` (Rango: ${item.rangeStart} - ${item.rangeEnd}, Max: ${item.rangeLimit})`;
+      }
+
+      const badgeClass = item.type === 'alarma' ? 'badge-alarma' : 'badge-recordatorio';
+
+      div.innerHTML = `
+        <div class="knowledge-item-header">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="algorithm-card-badge ${badgeClass}">${escapeHtml(item.type)}</span>
+            <div class="knowledge-item-title">${escapeHtml(item.name || item.title)}</div>
+          </div>
+          <label class="switch-toggle" title="Activar/Desactivar">
+            <input type="checkbox" class="toggle-rule-active" data-id="${item.id}" ${item.active ? 'checked' : ''}>
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+        <div class="knowledge-item-desc">
+          <strong>Horario:</strong> ${escapeHtml(scheduleText)}<br>
+          <strong>Mensaje:</strong> "${escapeHtml(item.message)}"
+        </div>
+        <div class="item-actions">
+          ${item.soundUrl ? `<button class="btn-edit btn-play-sound" data-id="${item.id}">Escuchar Sonido</button>` : ''}
+          <button class="btn-edit btn-edit-rule" data-id="${item.id}">Editar</button>
+          <button class="btn-delete btn-delete-rule" data-id="${item.id}">Eliminar</button>
+        </div>
+      `;
+
+      div.querySelector('.toggle-rule-active').addEventListener('change', (e) => toggleRuleActive(item.id, e.target.checked));
+      div.querySelector('.btn-delete-rule').addEventListener('click', () => deleteAlgorithmItem(item.id));
+      div.querySelector('.btn-edit-rule').addEventListener('click', () => editAlgorithmItem(item));
+      if (item.soundUrl) {
+        div.querySelector('.btn-play-sound')?.addEventListener('click', () => {
+          const audio = new Audio(item.soundUrl);
+          audio.volume = item.volume || 0.8;
+          audio.play().catch((e) => console.warn('Could not play preview sound:', e));
+        });
+      }
+
+    } else {
+      div.innerHTML = `
+        <div class="knowledge-item-header">
+          <div class="knowledge-item-title">${escapeHtml(item.title)}</div>
+          <span style="font-size: 0.75rem; color: #94a3b8; font-weight: 500;">${item.type.toUpperCase()}</span>
+        </div>
+        <div class="knowledge-item-desc">${escapeHtml((item.content || '').substring(0, 140))}${(item.content || '').length > 140 ? '...' : ''}</div>
+        <div class="item-actions">
+          <button class="btn-delete btn-delete-kitem" data-id="${item.id}">Eliminar</button>
+        </div>
+      `;
+
+      div.querySelector('.btn-delete-kitem').addEventListener('click', () => deleteItem(item.id));
+    }
+
+    container.appendChild(div);
+  });
+}
+
+async function toggleRuleActive(id, isActive) {
+  let rules = getLocalAlarms();
+  const index = rules.findIndex((r) => r.id === id);
+  if (index !== -1) {
+    const targetRule = rules[index];
+    targetRule.active = isActive;
+    saveLocalAlarms(rules);
+    showToast(isActive ? 'Regla activada' : 'Regla desactivada');
+
+    try {
+      if (targetRule.db_id) {
+        await supabase.from('alarms_reminders').update({ active: isActive }).eq('id', targetRule.db_id);
+      } else {
+        await supabase.from('alarms_reminders').update({ active: isActive }).eq('name', targetRule.name);
+      }
+    } catch (e) {}
+  }
+}
+
+async function deleteAlgorithmItem(id) {
+  let rules = getLocalAlarms();
+  const target = rules.find((r) => r.id === id);
+  rules = rules.filter((r) => r.id !== id);
+  saveLocalAlarms(rules);
+  showToast('Regla eliminada');
+
+  if (target) {
+    try {
+      if (target.db_id) {
+        await supabase.from('alarms_reminders').delete().eq('id', target.db_id);
+      } else {
+        await supabase.from('alarms_reminders').delete().eq('name', target.name);
+      }
+    } catch (e) {}
+  }
+}
+
+function editAlgorithmItem(rule) {
+  if (window.openRuleEditorModal) {
+    window.openRuleEditorModal(rule, () => {
+      renderKnowledgeList();
+    });
+  }
+}
+
+async function deleteItem(id) {
+  let items = getLocalKnowledge();
+  const target = items.find((item) => item.id === id);
+  items = items.filter((item) => item.id !== id);
+  saveLocalKnowledge(items);
+  showToast('Registro eliminado');
+
+  if (target) {
+    try {
+      if (target.db_id) {
+        await supabase.from('knowledge').delete().eq('id', target.db_id);
+      } else {
+        await supabase.from('knowledge').delete().eq('title', target.title);
+      }
+    } catch (e) {}
+  }
+}
+
+function escapeHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function showToast(message) {
+  const toast = document.createElement('div');
+  toast.className = 'toast-msg';
+  toast.innerText = message;
+  document.body.appendChild(toast);
+  setTimeout(() => {
+    if (toast.parentNode) toast.parentNode.removeChild(toast);
+  }, 2200);
+}
