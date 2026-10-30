@@ -1,6 +1,7 @@
 // Medical Assistant Client Logic - docs/js/medical.js
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import { Scene3D } from './three-scene.js';
+import { initializeActiveAssistant } from './assistant-manager.js';
 
 const SUPABASE_URL = 'https://qqjhadwxboeichxtxree.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFxamhhZHd4Ym9laWNoeHR4cmVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4NDY4ODAsImV4cCI6MjA5NTQyMjg4MH0.dM1VaV-lDPxoPlOHGAIbgfCSE3RMdURcVubq8tTs6yQ';
@@ -36,6 +37,7 @@ function stopSpeech() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  initializeActiveAssistant();
   setup3DViewer();
   setupSpeechRecognition();
   setupEventListeners();
