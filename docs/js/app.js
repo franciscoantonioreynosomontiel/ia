@@ -1,5 +1,6 @@
 // Main App Controller - Shared Chatbot & Background Engine across all HTML pages
 import { Scene3D } from './three-scene.js';
+import { initializeActiveAssistant } from './assistant-manager.js';
 import { processGeminiRequest, clearChatHistory } from './gemini.js';
 import { uploadToCloudinary } from './cloudinary.js';
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
@@ -533,6 +534,7 @@ function restoreChatSession() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  initializeActiveAssistant();
   ensureGlobalChatbotUI();
   setup3DViewer();
   setupSpeechRecognition();

@@ -1,5 +1,6 @@
 // Music Player Controller & Cloudinary Voice Interaction
 import { Scene3D } from './three-scene.js';
+import { initializeActiveAssistant } from './assistant-manager.js';
 
 const STORAGE_KEY_MUSIC = 'ia_agent_music_library';
 
@@ -155,6 +156,7 @@ const SUPABASE_URL = 'https://qqjhadwxboeichxtxree.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFxamhhZHd4Ym9laWNoeHR4cmVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4NDY4ODAsImV4cCI6MjA5NTQyMjg4MH0.dM1VaV-lDPxoPlOHGAIbgfCSE3RMdURcVubq8tTs6yQ';
 
 document.addEventListener('DOMContentLoaded', () => {
+  initializeActiveAssistant();
   setup3DViewer();
   setupSpeechRecognition();
   initMusicMicPermissions();
